@@ -2,6 +2,7 @@ package com.tiendatecnologica.service;
 
 import com.tiendatecnologica.model.DetalleCompra;
 import com.tiendatecnologica.model.OrdenCompra;
+import com.tiendatecnologica.persistence.Transaccion;
 import com.tiendatecnologica.repository.OrdenCompraRepository;
 
 import java.util.List;
@@ -73,32 +74,25 @@ public class CompraService {
         validarTransicion(orden, "Recibida");
 
         /*
-         * Primero verifica que todos los productos existan.
-         * Esto evita comenzar a modificar el inventario si algún
-         * producto de la orden no es válido.
+         * Todo ocurre en una sola transacción: si falla una entrada de
+         * inventario o el cambio de estado, se revierte todo y la orden
+         * sigue Pendiente (sin stock sumado a medias ni duplicado al reintentar).
+         * registrarEntrada ya valida que el producto exista.
          */
-        for (DetalleCompra detalle : orden.getDetalles()) {
-            inventarioService.obtenerExistencia(
-                    detalle.getIdProducto()
-            );
-        }
+        Transaccion.ejecutar(con -> {
+            for (DetalleCompra detalle : orden.getDetalles()) {
+                inventarioService.registrarEntrada(
+                        con,
+                        detalle.getIdProducto(),
+                        detalle.getCantidad(),
+                        "Compra " + orden.getIdOrden()
+                );
+            }
+            repositorio.actualizarEstado(con, orden.getIdOrden(), "Recibida");
+            return null;
+        });
 
-        /*
-         * Una vez validados todos los productos, registra las
-         * entradas correspondientes en el inventario.
-         */
-        for (DetalleCompra detalle : orden.getDetalles()) {
-            inventarioService.registrarEntrada(
-                    detalle.getIdProducto(),
-                    detalle.getCantidad(),
-                    "Compra " + orden.getIdOrden()
-            );
-        }
-
-        // Finalmente cambia el estado de la orden.
         orden.setEstado("Recibida");
-
-        repositorio.actualizar(orden);
     }
 
     /**

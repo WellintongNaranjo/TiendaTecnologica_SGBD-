@@ -7,7 +7,7 @@ import com.tiendatecnologica.model.Pago;
 import com.tiendatecnologica.model.Producto;
 import com.tiendatecnologica.model.Venta;
 import com.tiendatecnologica.persistence.Transaccion;
-import com.tiendatecnologica.repository.ClienteRepository;
+import com.tiendatecnologica.repository.ClienteJDBC_Repository;
 import com.tiendatecnologica.repository.DetalleVentaRepository;
 import com.tiendatecnologica.repository.VentaRepository;
 import com.tiendatecnologica.util.Constantes;
@@ -24,13 +24,13 @@ public class VentaService {
 
     private final VentaRepository ventaRepository = new VentaRepository();
     private final DetalleVentaRepository detalleVentaRepository = new DetalleVentaRepository();
-    private final ClienteRepository clienteRepository = new ClienteRepository();
+    private final ClienteJDBC_Repository clienteRepository = new ClienteJDBC_Repository();
 
     private final ProductoService productoService = new ProductoService();
     private final InventarioService inventarioService = new InventarioService();
 
 
-    
+
     public DetalleVenta crearItemCarrito(String codigoProducto, int cantidad) {
         Validador.validarTexto(codigoProducto, "Código de producto");
         if (cantidad <= 0) {
@@ -53,7 +53,7 @@ public class VentaService {
     }
 
 
-    
+
     public Venta registrarVenta(String idCliente, List<DetalleVenta> items,
                                 MetodoPago metodoPago, double montoRecibido) {
         Validador.validarTexto(idCliente, "Cliente");
@@ -65,7 +65,7 @@ public class VentaService {
         }
 
 
-        
+
         Map<String, Integer> cantidadPorProducto = new LinkedHashMap<>();
         for (DetalleVenta item : items) {
             if (item.getCantidad() <= 0) {
@@ -88,13 +88,13 @@ public class VentaService {
         double total = redondear(subtotal + impuesto);
 
 
-        
+
         Pago pago = new Pago(metodoPago, montoRecibido, total);
 
-        final double subtotalVenta = subtotal; 
+        final double subtotalVenta = subtotal;
 
 
-        
+
         Venta venta = Transaccion.ejecutar(con -> {
             String idVenta = GeneradorId.generarIdVenta(con);
             Venta nueva = new Venta(idVenta, LocalDateTime.now(), idCliente,
@@ -114,7 +114,7 @@ public class VentaService {
         return venta;
     }
 
-  
+
     public void anularVenta(String idVenta) {
         Venta venta = ventaRepository.buscarPorClave(idVenta);
         if (venta == null) {
@@ -124,7 +124,7 @@ public class VentaService {
             throw new IllegalStateException("La venta " + idVenta + " ya está anulada");
         }
 
- 
+
         Transaccion.ejecutar(con -> {
             for (DetalleVenta detalle : detalleVentaRepository.obtenerPorVenta(idVenta)) {
                 inventarioService.registrarEntrada(
@@ -138,20 +138,20 @@ public class VentaService {
 
 
 
-    
+
     public Venta buscarVenta(String idVenta) {
         return ventaRepository.buscarPorClave(idVenta);
     }
 
 
-    
+
     public List<Venta> listarVentas() {
         return ventaRepository.obtenerTodos();
     }
 
 
 
-    
+
     public List<DetalleVenta> obtenerDetalle(String idVenta) {
         List<DetalleVenta> detalles = detalleVentaRepository.obtenerPorVenta(idVenta);
         for (DetalleVenta detalle : detalles) {
