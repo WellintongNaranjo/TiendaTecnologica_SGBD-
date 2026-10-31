@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Base genérica para repositorios que guardan sus entidades en MySQL con JDBC.
- * Es el equivalente de {@link CsvRepository}, pero contra la base de datos.
+ * Guarda y lee las entidades directamente en MySQL.
  *
  * <p>Usa el mismo patrón "método plantilla": cada repositorio concreto solo
  * dice cómo se llama su tabla, cuál es su clave, qué SQL usa para insertar y
@@ -23,7 +23,7 @@ import java.util.List;
  */
 
 //crud generico Solo ejecuta el SQL que le den y ya
-    //como es la base de los demas repositoys llama a jdbs support para poder hacer las funciones sql sin repetir codigo
+//como es la base de los demas repositoys llama a jdbs support para poder hacer las funciones sql sin repetir codigo
 public abstract class JdbcRepository<T> extends JdbcSupport implements Repository<T> {
 
     // ------------------------------------------------------------------
@@ -108,7 +108,7 @@ public abstract class JdbcRepository<T> extends JdbcSupport implements Repositor
     /**
      * Calcula el siguiente id con formato {@code PREFIJO-00001} mirando el
      * mayor número que ya existe en la tabla. Reemplaza a
-     * {@code GeneradorId} (que contaba líneas de un CSV).
+     * {@code GeneradorId} para los repositorios que heredan de esta clase.
      *
      * @param prefijo prefijo del id incluyendo el guion (ej. "PROV-")
      * @return el id siguiente, listo para usar

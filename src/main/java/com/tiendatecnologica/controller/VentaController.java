@@ -50,6 +50,14 @@ public class VentaController {
     private final ProductoService productoService =
             new ProductoService();
 
+    /** Cada carga tiene su propio ejecutor para que una no bloquee a las otras. */
+    private final EjecutorEnSegundoPlano ejecutorProductos = new EjecutorEnSegundoPlano();
+    private final EjecutorEnSegundoPlano ejecutorVentas = new EjecutorEnSegundoPlano();
+    private final EjecutorEnSegundoPlano ejecutorClientes = new EjecutorEnSegundoPlano();
+
+    /** Ejecuta la anulación de una venta (varias escrituras) en un hilo aparte. */
+    private final EjecutorEnSegundoPlano ejecutorAnulacion = new EjecutorEnSegundoPlano();
+
     /**
      * Lista observable que representa el carrito de la venta actual.
      */
@@ -86,8 +94,8 @@ public class VentaController {
     private TextField campoEmailCliente;
 
 
-     //CAMBIO CLIENTES: ComboBox con los clientes ya registrados.
-     //Permite elegir un cliente sin tener que buscarlo por cédula.
+    //CAMBIO CLIENTES: ComboBox con los clientes ya registrados.
+    //Permite elegir un cliente sin tener que buscarlo por cédula.
     @FXML
     private ComboBox<Cliente> comboClientes;
 
@@ -307,10 +315,12 @@ public class VentaController {
      */
     public void cargarProductos() {
 
-        comboProductos.setItems(
-                FXCollections.observableArrayList(
-                        productoService.listarProductos()
-                )
+        // La consulta corre en un hilo aparte; si falla se muestra una alerta.
+        ejecutorProductos.ejecutar(
+                productoService::listarProductos,
+                productos -> comboProductos.setItems(
+                        FXCollections.observableArrayList(productos)),
+                this::mostrarError
         );
     }
 
@@ -385,8 +395,8 @@ public class VentaController {
 
             // CAMBIO CLIENTES: se recarga la lista para que el cliente recién
             // registrado aparezca en el combo, y se deja seleccionado.
-            cargarClientes();
-            seleccionarClienteEnCombo(nuevo.getId());
+            // La lista se carga en segundo plano, así que la selección se hace al terminar.
+            cargarClientes(() -> seleccionarClienteEnCombo(nuevo.getId()));
 
         } catch (Exception e) {
             mostrarError(e.getMessage());
@@ -569,10 +579,12 @@ public class VentaController {
     @FXML
     public void cargarVentas() {
 
-        tablaVentas.setItems(
-                FXCollections.observableArrayList(
-                        ventaService.listarVentas()
-                )
+        // La consulta corre en un hilo aparte; si falla se muestra una alerta.
+        ejecutorVentas.ejecutar(
+                ventaService::listarVentas,
+                ventas -> tablaVentas.setItems(
+                        FXCollections.observableArrayList(ventas)),
+                this::mostrarError
         );
     }
 
@@ -599,21 +611,23 @@ public class VentaController {
             return;
         }
 
-        try {
+        String idVenta = seleccionada.getId();
 
-            ventaService.anularVenta(
-                    seleccionada.getId()
-            );
+        // La anulación reintegra stock y cambia el estado en una transacción;
+        // corre en un hilo aparte y al terminar se refrescan ventas e inventario.
+        ejecutorAnulacion.ejecutar(
+                () -> {
+                    ventaService.anularVenta(idVenta);
+                    return null;
+                },
+                resultado -> {
+                    cargarVentas();
 
-            cargarVentas();
-
-            // Actualiza el inventario mostrado después de la anulación.
-            cargarProductos();
-
-        } catch (Exception e) {
-
-            mostrarError(e.getMessage());
-        }
+                    // Actualiza el inventario mostrado después de la anulación.
+                    cargarProductos();
+                },
+                this::mostrarError
+        );
     }
 
     /**
@@ -780,23 +794,34 @@ public class VentaController {
     /**
      * CAMBIO CLIENTES: carga los clientes registrados en el ComboBox.
      *
-     * Consulta MySQL, así que lleva try/catch: si la base falla se muestra
+     * Consulta MySQL en un hilo aparte: si la base falla se muestra
      * una alerta en lugar de cerrar la aplicación.
      */
     public void cargarClientes() {
 
-        try {
+        cargarClientes(null);
+    }
 
-            comboClientes.setItems(
-                    FXCollections.observableArrayList(
-                            clienteService.listarClientes()
-                    )
-            );
+    /**
+     * Carga los clientes en segundo plano y, cuando termina, ejecuta una acción
+     * opcional (por ejemplo, seleccionar al cliente recién registrado).
+     *
+     * @param alTerminar acción a ejecutar con la lista ya cargada; puede ser null
+     */
+    private void cargarClientes(Runnable alTerminar) {
 
-        } catch (Exception e) {
+        ejecutorClientes.ejecutar(
+                clienteService::listarClientes,
+                clientes -> {
+                    comboClientes.setItems(
+                            FXCollections.observableArrayList(clientes));
 
-            mostrarError(e.getMessage());
-        }
+                    if (alTerminar != null) {
+                        alTerminar.run();
+                    }
+                },
+                this::mostrarError
+        );
     }
 
     /**

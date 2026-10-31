@@ -131,16 +131,6 @@ public class DevolucionService {
     }
 
     /**
-     * Busca una solicitud de devolución por su id.
-     *
-     * @param idDevolucion id a buscar
-     * @return la solicitud encontrada, o null si no existe
-     */
-    public Devolucion buscarDevolucion(String idDevolucion) {
-        return devolucionRepository.buscarPorClave(idDevolucion);
-    }
-
-    /**
      * Lista las solicitudes de devolución en un estado dado. El filtro lo aplica MySQL.
      *
      * @param estado estado a filtrar; null equivale a "Todos" (sin filtro)

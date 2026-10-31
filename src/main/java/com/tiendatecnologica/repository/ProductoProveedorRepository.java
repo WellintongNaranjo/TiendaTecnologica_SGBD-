@@ -9,7 +9,7 @@ import java.util.List;
 
 
 //basicamente sirve para listas de parejas entre provedores y productos
-public class ProductoProveedorJDBC_Repository extends JdbcSupport {
+public class ProductoProveedorRepository extends JdbcSupport {
 
     // Crea el vínculo entre un producto y un proveedor (una fila nueva en producto_proveedor).
     // Si el par ya existe, MySQL lanza el error 1062 y RepositorioException lo traduce.

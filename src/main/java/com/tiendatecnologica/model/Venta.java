@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
  * Representa la cabecera de una venta (la "factura"): a quién se le
  * vendió, cuándo, los montos totales y cómo se pagó. Las líneas de
  * productos vendidos viven aparte, en {@link DetalleVenta} /
- * {@code detalle_ventas.csv}, igual que un producto no sabe de sus
+ * la tabla {@code detalle_venta}, igual que un producto no sabe de sus
  * movimientos de inventario.
  */
 public class Venta {

@@ -2,8 +2,8 @@ package com.tiendatecnologica.model;
 
 /**
  * Representa un producto del catálogo de la tienda. Solo contiene datos y
- * comportamiento básico propio del producto; no sabe nada de CSV ni de
- * cómo se guarda (eso es responsabilidad de ProductoRepository).
+ * comportamiento básico propio del producto; no sabe nada de MySQL ni de
+ * cómo se guarda (eso es responsabilidad de ProductoJDBC_Repository).
  */
 public class Producto {
 

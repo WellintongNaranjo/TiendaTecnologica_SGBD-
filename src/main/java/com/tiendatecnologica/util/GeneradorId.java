@@ -49,10 +49,6 @@ public final class GeneradorId {
         return generar("CLI-", "cliente", "id");
     }
 
-    public static String generarIdPago() {
-        return "PAGO-" + String.format("%05d", 1);
-    }
-
     private static String generar(String prefijo, String tabla, String columna) {
         try (Connection con = ConexionBD.getConexion()) {
             return generar(con, prefijo, tabla, columna);

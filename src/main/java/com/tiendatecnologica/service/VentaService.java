@@ -2,13 +2,17 @@ package com.tiendatecnologica.service;
 
 import com.tiendatecnologica.enums.EstadoVenta;
 import com.tiendatecnologica.enums.MetodoPago;
+import com.tiendatecnologica.enums.TipoMovimiento;
+import com.tiendatecnologica.model.Devolucion;
 import com.tiendatecnologica.model.DetalleVenta;
+import com.tiendatecnologica.model.MovimientoInventario;
 import com.tiendatecnologica.model.Pago;
 import com.tiendatecnologica.model.Producto;
 import com.tiendatecnologica.model.Venta;
 import com.tiendatecnologica.persistence.Transaccion;
-import com.tiendatecnologica.repository.ClienteJDBC_Repository;
+import com.tiendatecnologica.repository.ClienteRepository;
 import com.tiendatecnologica.repository.DetalleVentaRepository;
+import com.tiendatecnologica.repository.DevolucionRepository;
 import com.tiendatecnologica.repository.VentaRepository;
 import com.tiendatecnologica.util.Constantes;
 import com.tiendatecnologica.util.GeneradorId;
@@ -24,7 +28,8 @@ public class VentaService {
 
     private final VentaRepository ventaRepository = new VentaRepository();
     private final DetalleVentaRepository detalleVentaRepository = new DetalleVentaRepository();
-    private final ClienteJDBC_Repository clienteRepository = new ClienteJDBC_Repository();
+    private final ClienteRepository clienteRepository = new ClienteRepository();
+    private final DevolucionRepository devolucionRepository = new DevolucionRepository();
 
     private final ProductoService productoService = new ProductoService();
     private final InventarioService inventarioService = new InventarioService();
@@ -115,6 +120,17 @@ public class VentaService {
     }
 
 
+    /**
+     * Anula una venta y devuelve al inventario las unidades que todavía no
+     * regresaron. Si alguna devolución de esta venta ya fue aprobada, su
+     * cantidad ya se reintegró al aprobarla, así que se descuenta aquí para
+     * no reintegrar dos veces el mismo stock. La anulación completa (entradas
+     * de inventario y cambio de estado) se guarda en una sola transacción.
+     *
+     * @param idVenta id de la venta a anular
+     * @throws IllegalArgumentException si la venta no existe
+     * @throws IllegalStateException si la venta ya está anulada
+     */
     public void anularVenta(String idVenta) {
         Venta venta = ventaRepository.buscarPorClave(idVenta);
         if (venta == null) {
@@ -124,11 +140,26 @@ public class VentaService {
             throw new IllegalStateException("La venta " + idVenta + " ya está anulada");
         }
 
+        // Unidades vendidas por producto (una venta puede repetir un producto en varias líneas).
+        Map<String, Integer> porReintegrar = new LinkedHashMap<>();
+        for (DetalleVenta detalle : detalleVentaRepository.obtenerPorVenta(idVenta)) {
+            porReintegrar.merge(detalle.getCodigoProducto(), detalle.getCantidad(), Integer::sum);
+        }
+
+        // Se resta lo que ya volvió al inventario por devoluciones aprobadas.
+        for (Devolucion devolucion : devolucionRepository.obtenerPorVenta(idVenta)) {
+            if (devolucionReintegroStock(devolucion)) {
+                porReintegrar.computeIfPresent(devolucion.getCodigoProducto(),
+                        (codigo, cantidad) -> Math.max(0, cantidad - devolucion.getCantidad()));
+            }
+        }
 
         Transaccion.ejecutar(con -> {
-            for (DetalleVenta detalle : detalleVentaRepository.obtenerPorVenta(idVenta)) {
-                inventarioService.registrarEntrada(
-                        con, detalle.getCodigoProducto(), detalle.getCantidad(), "Anulación venta " + idVenta);
+            for (Map.Entry<String, Integer> linea : porReintegrar.entrySet()) {
+                if (linea.getValue() > 0) {
+                    inventarioService.registrarEntrada(
+                            con, linea.getKey(), linea.getValue(), "Anulación venta " + idVenta);
+                }
             }
             venta.setEstado(EstadoVenta.ANULADA);
             ventaRepository.actualizar(con, venta);
@@ -136,8 +167,25 @@ public class VentaService {
         });
     }
 
-
-
+    /**
+     * Indica si una devolución ya devolvió su cantidad al inventario. Una
+     * devolución FINALIZADA pudo venir de APROBADA o de RECHAZADA, por eso se
+     * confirma buscando su movimiento de entrada ("Devolución ID") en el
+     * historial del producto.
+     *
+     * @param devolucion devolución a revisar
+     * @return true si existe la entrada de inventario generada al aprobarla
+     */
+    private boolean devolucionReintegroStock(Devolucion devolucion) {
+        String motivo = "Devolución " + devolucion.getId();
+        for (MovimientoInventario m
+                : inventarioService.obtenerMovimientosProducto(devolucion.getCodigoProducto())) {
+            if (m.getTipo() == TipoMovimiento.ENTRADA && motivo.equals(m.getMotivo())) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public Venta buscarVenta(String idVenta) {
         return ventaRepository.buscarPorClave(idVenta);

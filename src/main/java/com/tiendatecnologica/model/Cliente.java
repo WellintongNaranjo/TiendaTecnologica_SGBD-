@@ -2,8 +2,8 @@ package com.tiendatecnologica.model;
 
 /**
  * Representa a un cliente que puede realizar compras en la tienda.
- * Solo contiene datos propios del cliente; no sabe nada de CSV
- * (eso es responsabilidad de {@code ClienteRepository}).
+ * Solo contiene datos propios del cliente; no sabe nada de MySQL
+ * (eso es responsabilidad de {@code ClienteJDBC_Repository}).
  */
 public class Cliente {
 

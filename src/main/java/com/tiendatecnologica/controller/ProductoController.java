@@ -36,6 +36,12 @@ public class ProductoController {
     private final ProductoProveedorService asociacionService =
             new ProductoProveedorService();
 
+    /** Ejecuta la carga de la tabla en un hilo aparte para no congelar la ventana. */
+    private final EjecutorEnSegundoPlano ejecutorCarga = new EjecutorEnSegundoPlano();
+
+    /** Ejecuta las búsquedas en un hilo aparte (separado de la carga completa). */
+    private final EjecutorEnSegundoPlano ejecutorBusqueda = new EjecutorEnSegundoPlano();
+
     /** Campo para ingresar el código del producto. */
     @FXML
     private TextField campoCodigo;
@@ -199,6 +205,11 @@ public class ProductoController {
                 .addListener(
                         (obs, anterior, seleccionado) -> {
 
+                            // El stock solo se escribe al crear un producto; con uno
+                            // seleccionado el campo es de solo lectura porque el stock
+                            // cambia únicamente por movimientos de inventario.
+                            campoCantidad.setEditable(seleccionado == null);
+
                             if (seleccionado != null) {
                                 cargarFormulario(seleccionado);
 
@@ -328,26 +339,16 @@ public class ProductoController {
     @FXML
     public void buscarProducto() {
 
-        // CAMBIO SQL: los productos ahora vienen de MySQL, así que esta llamada
-        // puede lanzar RepositorioException (por ejemplo, si la base está apagada).
-        // El try/catch evita que la aplicación se cierre y muestra el mensaje.
-        try {
+        // La consulta corre en un hilo aparte; si falla (por ejemplo, MySQL apagado)
+        // se muestra una alerta en lugar de cerrar la aplicación.
+        String texto = campoBusqueda.getText();
 
-            String texto =
-                    campoBusqueda.getText();
-
-            ObservableList<Producto> resultado =
-                    FXCollections.observableArrayList(
-                            productoService.buscarProductos(texto)
-                    );
-
-            tablaProductos.setItems(resultado);
-
-        } catch (Exception e) {
-
-            // El mensaje ya viene listo para el usuario desde RepositorioException.
-            mostrarError(e.getMessage());
-        }
+        ejecutorBusqueda.ejecutar(
+                () -> productoService.buscarProductos(texto),
+                resultado -> tablaProductos.setItems(
+                        FXCollections.observableArrayList(resultado)),
+                this::mostrarError
+        );
     }
 
     /**
@@ -356,22 +357,15 @@ public class ProductoController {
     @FXML
     public void cargarProductos() {
 
-        // CAMBIO SQL: antes se leía un CSV local, ahora se consulta la base de datos.
-        // Si la consulta falla, se muestra una alerta en lugar de cerrar la aplicación.
+        // La consulta corre en un hilo aparte para que la ventana no se congele.
+        // Si falla, se muestra una alerta en lugar de cerrar la aplicación.
         // Este método también se llama desde initialize(), así que cubre la carga inicial.
-        try {
-
-            ObservableList<Producto> productos =
-                    FXCollections.observableArrayList(
-                            productoService.listarProductos()
-                    );
-
-            tablaProductos.setItems(productos);
-
-        } catch (Exception e) {
-
-            mostrarError(e.getMessage());
-        }
+        ejecutorCarga.ejecutar(
+                productoService::listarProductos,
+                productos -> tablaProductos.setItems(
+                        FXCollections.observableArrayList(productos)),
+                this::mostrarError
+        );
     }
 
     // ------------------------------------------------------------------

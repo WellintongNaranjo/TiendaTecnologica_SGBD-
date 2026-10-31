@@ -1,8 +1,7 @@
 package com.tiendatecnologica.service;
 
 import com.tiendatecnologica.model.Proveedor;
-// CAMBIO SQL: se importa el repositorio JDBC (MySQL) en lugar del que usa CSV.
-import com.tiendatecnologica.repository.ProveedorJDBC_Repository;
+import com.tiendatecnologica.repository.ProveedorRepository;
 
 import java.util.List;
 
@@ -16,8 +15,8 @@ public class ProveedorService {
 
     // CAMBIO SQL: ahora el service guarda y lee los proveedores en MySQL.
     // El nombre de la variable se mantiene para no tocar el resto de la clase.
-    private final ProveedorJDBC_Repository proveedorRepository =
-            new ProveedorJDBC_Repository();
+    private final ProveedorRepository proveedorRepository =
+            new ProveedorRepository();
 
     // CAMBIO ID: prefijo con el que se generan los ids (PROV-00001, PROV-00002...).
     private static final String PREFIJO_ID = "PROV-";

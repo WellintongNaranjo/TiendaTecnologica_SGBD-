@@ -49,16 +49,6 @@ public class CompraService {
     }
 
     /**
-     * Busca una orden de compra por su identificador.
-     *
-     * @param idOrden identificador de la orden
-     * @return orden encontrada o null si no existe
-     */
-    public OrdenCompra buscarCompra(String idOrden) {
-        return repositorio.buscarPorClave(idOrden);
-    }
-
-    /**
      * Marca una orden como recibida.
      *
      * Una compra solamente puede pasar de Pendiente a Recibida.

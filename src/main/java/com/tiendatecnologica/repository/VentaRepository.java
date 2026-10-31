@@ -80,23 +80,6 @@ public class VentaRepository implements Repository<Venta> {
         return buscarPorClave(id) != null;
     }
 
-    public List<Venta> obtenerVentasPorCliente(String idCliente) {
-        String sql = "SELECT " + COLUMNAS + " FROM venta WHERE id_cliente = ? ORDER BY fecha, id";
-        List<Venta> ventas = new ArrayList<>();
-        try (Connection con = ConexionBD.getConexion();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setString(1, idCliente);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    ventas.add(mapear(rs));
-                }
-            }
-        } catch (SQLException e) {
-            throw error("leer las ventas del cliente " + idCliente, e);
-        }
-        return ventas;
-    }
-
     public Venta buscarPorClave(Connection con, String id) throws SQLException {
         String sql = "SELECT " + COLUMNAS + " FROM venta WHERE id = ?";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
