@@ -13,7 +13,7 @@ public class DetalleVenta {
     private int cantidad;
     private double precioUnitario;
 
-    /** Nombre del producto, solo para mostrar en pantalla; no se guarda en el CSV. */
+    /** Nombre del producto, solo para mostrar en pantalla; no se guarda en la base de datos. */
     private String nombreProducto;
 
     /**

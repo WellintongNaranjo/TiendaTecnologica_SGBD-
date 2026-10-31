@@ -2,9 +2,9 @@ package com.tiendatecnologica.service;
 
 import com.tiendatecnologica.model.Producto;
 import com.tiendatecnologica.model.Proveedor;
-import com.tiendatecnologica.repository.ProductoJDBC_Repository;
-import com.tiendatecnologica.repository.ProductoProveedorJDBC_Repository;
-import com.tiendatecnologica.repository.ProveedorJDBC_Repository;
+import com.tiendatecnologica.repository.ProductoRepository;
+import com.tiendatecnologica.repository.ProductoProveedorRepository;
+import com.tiendatecnologica.repository.ProveedorRepository;
 import com.tiendatecnologica.util.Validador;
 
 import java.util.ArrayList;
@@ -22,14 +22,14 @@ import java.util.Set;
 public class ProductoProveedorService {
 
     // Maneja la tabla de parejas producto_proveedor (asociar, desasociar, existe).
-    private final ProductoProveedorJDBC_Repository asociacionRepository =
-            new ProductoProveedorJDBC_Repository();
+    private final ProductoProveedorRepository asociacionRepository =
+            new ProductoProveedorRepository();
 
     // Aportan las consultas con JOIN y la lista completa de proveedores.
-    private final ProveedorJDBC_Repository proveedorRepository =
-            new ProveedorJDBC_Repository();
-    private final ProductoJDBC_Repository productoRepository =
-            new ProductoJDBC_Repository();
+    private final ProveedorRepository proveedorRepository =
+            new ProveedorRepository();
+    private final ProductoRepository productoRepository =
+            new ProductoRepository();
 
     /**
      * @param codigoProducto código del producto
@@ -38,15 +38,6 @@ public class ProductoProveedorService {
     public List<Proveedor> listarProveedoresDeProducto(String codigoProducto) {
         Validador.validarTexto(codigoProducto, "Producto");
         return proveedorRepository.obtenerPorProducto(codigoProducto);
-    }
-
-    /**
-     * @param idProveedor id del proveedor
-     * @return los productos que surte ese proveedor (lista vacía si no surte ninguno)
-     */
-    public List<Producto> listarProductosDeProveedor(String idProveedor) {
-        Validador.validarTexto(idProveedor, "Proveedor");
-        return productoRepository.obtenerPorProveedor(idProveedor);
     }
 
     /**

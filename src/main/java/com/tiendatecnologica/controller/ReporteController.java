@@ -524,13 +524,14 @@ public class ReporteController {
     }
 
     /**
-     * Formatea un monto con dos decimales y punto decimal (sin separador de miles).
+     * Formatea un monto con dos decimales y coma decimal (sin separador de miles),
+     * como lo espera Excel con configuración regional en español.
      *
      * @param valor monto a formatear
-     * @return el monto como texto, por ejemplo "519235.00"
+     * @return el monto como texto, por ejemplo "519235,00"
      */
     private static String dinero(double valor) {
-        return String.format(Locale.US, "%.2f", valor);
+        return String.format(Locale.US, "%.2f", valor).replace('.', ',');
     }
 
     /**

@@ -76,6 +76,9 @@ public class ProveedorController {
     /** Lista observable utilizada para mostrar los proveedores en la tabla. */
     private ObservableList<Proveedor> listaProveedores;
 
+    /** Ejecuta la carga de la tabla en un hilo aparte para no congelar la ventana. */
+    private final EjecutorEnSegundoPlano ejecutorCarga = new EjecutorEnSegundoPlano();
+
     /**
      * Inicializa el controlador.
      *
@@ -135,22 +138,17 @@ public class ProveedorController {
      */
     private void cargarDatos() {
 
-        // CAMBIO SQL: antes se leía un CSV local, ahora se consulta la base de datos.
-        // Si la consulta falla (por ejemplo, MySQL apagado), se muestra una alerta
-        // con el mensaje de RepositorioException en lugar de cerrar la aplicación.
-        try {
-
-            listaProveedores =
-                    FXCollections.observableArrayList(
-                            proveedorService.obtenerProveedores()
-                    );
-
-            tablaProveedores.setItems(listaProveedores);
-
-        } catch (Exception e) {
-
-            mostrarError(e.getMessage());
-        }
+        // La consulta corre en un hilo aparte. Si falla (por ejemplo, MySQL apagado),
+        // se muestra una alerta con el mensaje de RepositorioException en lugar de
+        // cerrar la aplicación.
+        ejecutorCarga.ejecutar(
+                proveedorService::obtenerProveedores,
+                proveedores -> {
+                    listaProveedores = FXCollections.observableArrayList(proveedores);
+                    tablaProveedores.setItems(listaProveedores);
+                },
+                this::mostrarError
+        );
     }
 
     /**

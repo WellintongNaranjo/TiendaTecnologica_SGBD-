@@ -119,16 +119,6 @@ public class GarantiaService {
     }
 
     /**
-     * Busca una solicitud de garantía por su id.
-     *
-     * @param idGarantia id a buscar
-     * @return la solicitud encontrada, o null si no existe
-     */
-    public Garantia buscarGarantia(String idGarantia) {
-        return garantiaRepository.buscarPorClave(idGarantia);
-    }
-
-    /**
      * Lista las solicitudes de garantía en un estado dado. El filtro lo aplica MySQL.
      *
      * @param estado estado a filtrar; null equivale a "Todos" (sin filtro)

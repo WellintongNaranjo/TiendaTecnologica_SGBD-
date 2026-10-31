@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 /**
  * Representa una solicitud de garantía sobre un producto vendido.
- * Solo contiene datos propios de la solicitud; no sabe nada de CSV
+ * Solo contiene datos propios de la solicitud; no sabe nada de MySQL
  * (eso es responsabilidad de {@code GarantiaRepository}) ni de cómo
  * se valida contra la venta original (eso lo hace {@code GarantiaService}).
  */
@@ -30,7 +30,7 @@ public class Garantia {
      * @param estado estado actual de la solicitud
      */
     public Garantia(String id, String idVenta, String codigoProducto, LocalDateTime fechaSolicitud,
-                     String descripcionProblema, EstadoGarantia estado) {
+                    String descripcionProblema, EstadoGarantia estado) {
         this.id = id;
         this.idVenta = idVenta;
         this.codigoProducto = codigoProducto;
