@@ -97,6 +97,12 @@ public class CompraController {
     /** Lista observable utilizada para mostrar las órdenes en la tabla. */
     private ObservableList<OrdenCompra> listaCompras;
 
+    /** Ejecuta la carga de la tabla de órdenes en un hilo aparte. */
+    private final EjecutorEnSegundoPlano ejecutorCarga = new EjecutorEnSegundoPlano();
+
+    /** Ejecuta la recepción de una orden (varias escrituras) en un hilo aparte. */
+    private final EjecutorEnSegundoPlano ejecutorRecepcion = new EjecutorEnSegundoPlano();
+
     /**
      * Lista temporal de detalles de la orden que se está creando.
      *
@@ -160,12 +166,15 @@ public class CompraController {
      */
     private void cargarDatos() {
 
-        listaCompras =
-                FXCollections.observableArrayList(
-                        servicio.obtenerCompras()
-                );
-
-        tablaCompras.setItems(listaCompras);
+        // La consulta corre en un hilo aparte; si falla se muestra una alerta.
+        ejecutorCarga.ejecutar(
+                servicio::obtenerCompras,
+                compras -> {
+                    listaCompras = FXCollections.observableArrayList(compras);
+                    tablaCompras.setItems(listaCompras);
+                },
+                this::mostrarError
+        );
     }
 
     /**
@@ -343,25 +352,25 @@ public class CompraController {
             return;
         }
 
-        try {
+        String idOrden = seleccionada.getIdOrden();
 
-            servicio.recibirCompra(
-                    seleccionada.getIdOrden()
-            );
-
-            cargarDatos();
-
-        } catch (IllegalArgumentException e) {
-
-            mostrarError(e.getMessage());
-        }
+        // Recibir una orden cambia su estado y registra entradas de inventario,
+        // así que corre en un hilo aparte; al terminar se recarga la tabla.
+        ejecutorRecepcion.ejecutar(
+                () -> {
+                    servicio.recibirCompra(idOrden);
+                    return null;
+                },
+                resultado -> cargarDatos(),
+                this::mostrarError
+        );
     }
 
     /**
      * Elimina de la orden el producto seleccionado en la tabla de detalles.
      *
      * El producto solamente se elimina de la lista temporal de la orden
-     * y no afecta ningún archivo CSV ni el inventario, ya que la orden
+     * y no afecta la base de datos ni el inventario, ya que la orden
      * todavía no ha sido registrada.
      */
     @FXML

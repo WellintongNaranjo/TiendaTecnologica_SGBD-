@@ -94,7 +94,7 @@ public abstract class MovimientoInventario {
     /**
      * Fija los valores de cantidad anterior y nueva sin recalcularlos.
      *
-     * Se utiliza al reconstruir un movimiento desde el archivo CSV,
+     * Se utiliza al reconstruir un movimiento desde la base de datos,
      * donde estos valores ya fueron calculados y almacenados.
      *
      * @param cantidadAnterior cantidad antes del movimiento
@@ -109,7 +109,7 @@ public abstract class MovimientoInventario {
     /**
      * Fija la cantidad registrada del movimiento sin recalcularla.
      *
-     * Se utiliza al reconstruir un movimiento desde el archivo CSV.
+     * Se utiliza al reconstruir un movimiento desde la base de datos.
      *
      * @param cantidad cantidad registrada en el historial
      */
@@ -173,29 +173,6 @@ public abstract class MovimientoInventario {
      */
     public String getMotivo() {
         return motivo;
-    }
-
-    /**
-     * Convierte el movimiento a una fila lista para escribir
-     * en movimientos.csv.
-     *
-     * Encabezado:
-     * id,codigoProducto,tipo,cantidad,cantidadAnterior,
-     * cantidadNueva,fecha,motivo
-     *
-     * @return arreglo de strings con los valores de cada columna
-     */
-    public String[] toCsv() {
-        return new String[] {
-                id,
-                codigoProducto,
-                getTipo().name(),
-                String.valueOf(cantidad),
-                String.valueOf(cantidadAnterior),
-                String.valueOf(cantidadNueva),
-                fecha.format(FORMATO_FECHA),
-                motivo == null ? "" : motivo
-        };
     }
 
     /**

@@ -1,8 +1,7 @@
 package com.tiendatecnologica.service;
 
 import com.tiendatecnologica.model.Cliente;
-// CAMBIO SQL: se importa el repositorio JDBC (MySQL) en lugar del que usa CSV.
-import com.tiendatecnologica.repository.ClienteJDBC_Repository;
+import com.tiendatecnologica.repository.ClienteRepository;
 // CAMBIO ID: se quitó el import de GeneradorId. Ya no se usa, porque el id
 // ahora lo genera la base de datos con siguienteId().
 import com.tiendatecnologica.util.Validador;
@@ -17,7 +16,7 @@ public class ClienteService {
 
     // CAMBIO SQL: ahora el service guarda y lee los clientes en MySQL.
     // El nombre de la variable se mantiene para no tocar el resto de la clase.
-    private final ClienteJDBC_Repository clienteRepository = new ClienteJDBC_Repository();
+    private final ClienteRepository clienteRepository = new ClienteRepository();
 
     // CAMBIO ID: prefijo con el que se generan los ids (CLI-00001, CLI-00002...).
     private static final String PREFIJO_ID = "CLI-";
@@ -41,8 +40,7 @@ public class ClienteService {
         Validador.validarTelefono(telefono);
         Validador.validarEmail(email);
 
-        // Sin cambios de lógica: buscarPorCedula ahora es un SELECT con WHERE en MySQL
-        // (antes recorría el CSV completo).
+        // buscarPorCedula es un SELECT con WHERE en MySQL.
         if (clienteRepository.buscarPorCedula(cedula) != null) {
             throw new IllegalArgumentException("Ya existe un cliente con la cédula " + cedula);
         }
@@ -62,38 +60,6 @@ public class ClienteService {
                 cedula, nombre, telefono, email);
         clienteRepository.guardar(cliente);
         return cliente;
-    }
-
-    /**
-     * Modifica un cliente existente.
-     *
-     * @param cliente cliente con los datos actualizados (identificado por su id)
-     * @throws IllegalArgumentException si algún dato es inválido o el id no existe
-     */
-    public void modificarCliente(Cliente cliente) {
-        Validador.validarTexto(cliente.getCedula(), "Cédula");
-        Validador.validarTexto(cliente.getNombre(), "Nombre");
-        Validador.validarCedula(cliente.getCedula());
-        Validador.validarNombre(cliente.getNombre());
-        Validador.validarTelefono(cliente.getTelefono());
-        Validador.validarEmail(cliente.getEmail());
-
-        if (!clienteRepository.existe(cliente.getId())) {
-            throw new IllegalArgumentException("No existe un cliente con el id " + cliente.getId());
-        }
-        // CAMBIO SQL: si la cédula nueva ya la tiene otro cliente, MySQL lo rechaza
-        // (restricción UNIQUE) y RepositorioException muestra el mensaje.
-        clienteRepository.actualizar(cliente);
-    }
-
-    /**
-     * Busca un cliente por su id.
-     *
-     * @param id id a buscar
-     * @return el cliente encontrado, o null si no existe
-     */
-    public Cliente buscarPorId(String id) {
-        return clienteRepository.buscarPorClave(id);
     }
 
     /**

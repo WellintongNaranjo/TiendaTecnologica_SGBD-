@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 /**
  * Representa una solicitud de devolución de una cantidad de un producto
  * comprado en una venta. Solo contiene datos propios de la solicitud;
- * no sabe nada de CSV (eso es responsabilidad de {@code DevolucionRepository})
+ * no sabe nada de MySQL (eso es responsabilidad de {@code DevolucionRepository})
  * ni de cómo se valida o cómo afecta el inventario (eso lo hace
  * {@code DevolucionService}).
  */
@@ -33,7 +33,7 @@ public class Devolucion {
      * @param estado estado actual de la solicitud
      */
     public Devolucion(String id, String idVenta, String codigoProducto, int cantidad,
-                       LocalDateTime fechaSolicitud, String motivo, EstadoDevolucion estado) {
+                      LocalDateTime fechaSolicitud, String motivo, EstadoDevolucion estado) {
         this.id = id;
         this.idVenta = idVenta;
         this.codigoProducto = codigoProducto;

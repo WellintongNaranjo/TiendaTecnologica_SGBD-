@@ -67,24 +67,6 @@ public final class ConexionBD {
         return DriverManager.getConnection(datos.getProperty("db.url"), info);
     }
 
-    /**
-     * Comprueba si es posible conectarse a la base de datos.
-     *
-     * Sirve para validar la configuración al iniciar la aplicación
-     * sin que un error cierre el programa.
-     *
-     * @return true si la conexión se abrió correctamente, false en caso contrario
-     */
-    public static boolean probarConexion() {
-        try (Connection con = getConexion()) {
-            return con.isValid(2);
-        } catch (SQLException e) {
-            System.err.println("No se pudo conectar a la base de datos: "
-                    + e.getMessage());
-            return false;
-        }
-    }
-
     /** Devuelve la configuración, leyéndola del classpath la primera vez. */
     private static synchronized Properties obtenerConfiguracion() throws SQLException {
         if (config == null) {

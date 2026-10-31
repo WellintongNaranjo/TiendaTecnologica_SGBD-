@@ -1,24 +1,21 @@
 package com.tiendatecnologica.service;
 
 import com.tiendatecnologica.model.Producto;
-import com.tiendatecnologica.repository.ProductoRepository;
 import com.tiendatecnologica.util.Validador;
 
 import java.util.ArrayList;
 import java.util.List;
 
-// este import es para hacer la implemetacion de la base de datos
-import com.tiendatecnologica.repository.ProductoJDBC_Repository;
+import com.tiendatecnologica.repository.ProductoRepository;
 
 /**
  * Lógica de negocio y validaciones sobre productos. Los Controllers hablan
- * con esta clase, nunca directamente con ProductoRepository.
+ * con esta clase, nunca directamente con ProductoJDBC_Repository.
  */
 public class ProductoService {
-    //ya aqui se llama al repositorio de la base de datos , no el de csv para que se encargue de el flujo de datos del sistema
-    private final ProductoJDBC_Repository productoRepository = new ProductoJDBC_Repository();
-    //se llama productoRepository igual para no modificar toda la logica que ya hay en esta clase service
-    //como los metodos en ambos JDBC y los CSV se llaman igual no afecta logica de esta clase y hacen lo mismo
+    /** Repositorio que guarda y lee los productos en MySQL. */
+    private final ProductoRepository productoRepository = new ProductoRepository();
+
     /**
      * Registra un nuevo producto, validando sus datos y que el código no exista.
      *

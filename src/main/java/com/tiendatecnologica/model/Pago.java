@@ -8,7 +8,7 @@ import com.tiendatecnologica.enums.MetodoPago;
  * Almacena el método de pago utilizado, el monto recibido del cliente
  * y el vuelto que debe entregarse.
  *
- * Estos datos se almacenan como columnas dentro de {@code ventas.csv}
+ * Estos datos se almacenan como columnas dentro de la tabla {@code venta}
  * mediante {@code VentaRepository}.
  *
  * La clase concentra la validación y el cálculo relacionados con el pago,
@@ -61,7 +61,7 @@ public class Pago {
 
     /**
      * Constructor privado utilizado para reconstruir un pago
-     * previamente calculado al leer una venta desde el archivo CSV.
+     * previamente calculado al leer una venta desde la base de datos.
      *
      * En este caso, el vuelto ya fue calculado y almacenado,
      * por lo que no es necesario repetir la validación de negocio.
@@ -86,7 +86,7 @@ public class Pago {
     /**
      * Reconstruye un pago que ya fue validado y almacenado.
      *
-     * Se utiliza al leer una venta desde el archivo CSV,
+     * Se utiliza al leer una venta desde la base de datos,
      * conservando el vuelto que fue calculado originalmente.
      *
      * @param metodoPago método utilizado para pagar

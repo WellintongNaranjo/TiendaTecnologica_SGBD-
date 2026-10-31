@@ -33,10 +33,6 @@ public final class Transaccion {
         }
     }
 
-    public static void ejecutarSinResultado(Trabajo<Void> trabajo) {
-        ejecutar(trabajo);
-    }
-
     private static void revertir(Connection con) {
         try {
             con.rollback();
