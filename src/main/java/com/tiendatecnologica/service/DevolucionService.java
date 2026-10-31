@@ -4,6 +4,7 @@ import com.tiendatecnologica.enums.EstadoDevolucion;
 import com.tiendatecnologica.model.DetalleVenta;
 import com.tiendatecnologica.model.Devolucion;
 import com.tiendatecnologica.model.Venta;
+import com.tiendatecnologica.persistence.Transaccion;
 import com.tiendatecnologica.repository.DevolucionRepository;
 import com.tiendatecnologica.util.GeneradorId;
 import com.tiendatecnologica.util.Validador;
@@ -37,7 +38,7 @@ public class DevolucionService {
      * @param cantidad cantidad de unidades a devolver (debe ser mayor que 0)
      * @param motivo razón por la que el cliente solicita la devolución
      * @return la solicitud de devolución ya registrada, con estado PENDIENTE
-     * @throws IllegalArgumentException si algún dato es inválido, la venta no existe,
+     * @throws IllegalArgumentException si algún dato es inválido, la venta no existe o está anulada,
      *         el producto no fue comprado en ella o la cantidad excede lo disponible para devolver
      */
     public Devolucion registrarDevolucion(String idVenta, String codigoProducto, int cantidad, String motivo) {
@@ -51,6 +52,9 @@ public class DevolucionService {
         Venta venta = ventaService.buscarVenta(idVenta);
         if (venta == null) {
             throw new IllegalArgumentException("No existe la venta " + idVenta);
+        }
+        if (!venta.estaCompletada()) {
+            throw new IllegalArgumentException("La venta " + idVenta + " está anulada");
         }
 
         int cantidadComprada = cantidadCompradaEn(idVenta, codigoProducto);
@@ -78,7 +82,9 @@ public class DevolucionService {
      * transición sea válida según el flujo definido: PENDIENTE {@literal ->}
      * EN_REVISION {@literal ->} (APROBADA o RECHAZADA) {@literal ->} FINALIZADA.
      * Al pasar a APROBADA, la cantidad devuelta se reintegra automáticamente
-     * al inventario del producto.
+     * al inventario del producto. El cambio de estado y el reingreso al
+     * inventario se guardan en una sola transacción: o se hacen los dos o
+     * no se hace ninguno.
      *
      * @param idDevolucion id de la solicitud a actualizar
      * @param nuevoEstado estado al que se quiere avanzar
@@ -92,14 +98,36 @@ public class DevolucionService {
         }
         validarTransicion(devolucion.getEstado(), nuevoEstado);
 
-        if (nuevoEstado == EstadoDevolucion.APROBADA) {
-            inventarioService.registrarEntrada(
-                    devolucion.getCodigoProducto(), devolucion.getCantidad(),
-                    "Devolución " + devolucion.getId());
-        }
+        Transaccion.ejecutar(con -> {
+            devolucionRepository.actualizarEstado(con, devolucion.getId(), nuevoEstado);
+            if (nuevoEstado == EstadoDevolucion.APROBADA) {
+                inventarioService.registrarEntrada(
+                        con, devolucion.getCodigoProducto(), devolucion.getCantidad(),
+                        "Devolución " + devolucion.getId());
+            }
+            return null;
+        });
+    }
 
-        devolucion.setEstado(nuevoEstado);
-        devolucionRepository.actualizar(devolucion);
+    /**
+     * Elimina una solicitud de devolución. Solo se permite si todavía está en
+     * estado PENDIENTE: una devolución aprobada ya reintegró inventario y las
+     * demás forman parte del historial, por lo que no deben borrarse.
+     *
+     * @param idDevolucion id de la solicitud a eliminar
+     * @throws IllegalArgumentException si la solicitud no existe
+     * @throws IllegalStateException si la solicitud ya no está PENDIENTE
+     */
+    public void eliminarDevolucion(String idDevolucion) {
+        Devolucion devolucion = devolucionRepository.buscarPorClave(idDevolucion);
+        if (devolucion == null) {
+            throw new IllegalArgumentException("No existe la devolución " + idDevolucion);
+        }
+        if (devolucion.getEstado() != EstadoDevolucion.PENDIENTE) {
+            throw new IllegalStateException(
+                    "Solo se puede eliminar una devolución PENDIENTE (esta está " + devolucion.getEstado() + ")");
+        }
+        devolucionRepository.eliminar(idDevolucion);
     }
 
     /**
@@ -113,10 +141,13 @@ public class DevolucionService {
     }
 
     /**
-     * @return todas las solicitudes de devolución registradas
+     * Lista las solicitudes de devolución en un estado dado. El filtro lo aplica MySQL.
+     *
+     * @param estado estado a filtrar; null equivale a "Todos" (sin filtro)
+     * @return las solicitudes de devolución que están en ese estado
      */
-    public List<Devolucion> listarDevoluciones() {
-        return devolucionRepository.obtenerTodos();
+    public List<Devolucion> listarDevolucionesPorEstado(EstadoDevolucion estado) {
+        return devolucionRepository.obtenerPorEstado(estado);
     }
 
     /**

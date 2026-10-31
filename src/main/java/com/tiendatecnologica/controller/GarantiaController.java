@@ -7,8 +7,10 @@ import com.tiendatecnologica.service.GarantiaService;
 import com.tiendatecnologica.service.VentaService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.TableColumn;
@@ -16,6 +18,8 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+
+import java.util.List;
 
 /**
  * Controlador de la pantalla de gestión de garantías.
@@ -56,6 +60,16 @@ public class GarantiaController {
     /** Campo para describir el problema presentado por el producto. */
     @FXML
     private TextArea campoDescripcionProblema;
+
+    /** Filtro por estado: "Todos" o uno de los valores de {@link EstadoGarantia}. */
+    @FXML
+    private ComboBox<String> comboFiltroEstado;
+
+    /** Última carga de la tabla en curso; solo se usa desde el hilo de JavaFX. */
+    private Task<List<Garantia>> tareaCarga;
+
+    /** Ejecuta en segundo plano las operaciones que escriben (o consultan una venta) en MySQL. */
+    private final EjecutorEnSegundoPlano ejecutor = new EjecutorEnSegundoPlano();
 
     /** Tabla que muestra el historial de garantías. */
     @FXML
@@ -113,6 +127,8 @@ public class GarantiaController {
 
         tablaGarantias.setItems(garantias);
 
+        FiltroEstado.configurar(comboFiltroEstado, EstadoGarantia.class, this::cargarGarantias);
+
         /*
          * Personaliza la forma en que los productos aparecen
          * dentro del ComboBox para facilitar su identificación.
@@ -161,23 +177,24 @@ public class GarantiaController {
             return;
         }
 
-        if (ventaService.buscarVenta(idVenta) == null) {
-
-            mostrarError(
-                    "No existe la venta " + idVenta
-            );
-
-            comboProductosVenta.setItems(
-                    FXCollections.observableArrayList()
-            );
-
-            return;
-        }
-
-        comboProductosVenta.setItems(
-                FXCollections.observableArrayList(
-                        ventaService.obtenerDetalle(idVenta)
-                )
+        // La consulta corre en segundo plano; devuelve null si la venta no existe.
+        ejecutor.ejecutar(
+                () -> ventaService.buscarVenta(idVenta) == null
+                        ? null
+                        : ventaService.obtenerDetalle(idVenta),
+                detalles -> {
+                    if (detalles == null) {
+                        mostrarError("No existe la venta " + idVenta);
+                        comboProductosVenta.setItems(
+                                FXCollections.observableArrayList()
+                        );
+                    } else {
+                        comboProductosVenta.setItems(
+                                FXCollections.observableArrayList(detalles)
+                        );
+                    }
+                },
+                this::mostrarError
         );
     }
 
@@ -190,36 +207,35 @@ public class GarantiaController {
     @FXML
     public void solicitarGarantia() {
 
-        try {
+        DetalleVenta seleccionado =
+                comboProductosVenta.getValue();
 
-            DetalleVenta seleccionado =
-                    comboProductosVenta.getValue();
-
-            if (seleccionado == null) {
-                mostrarError(
-                        "Busque una venta y seleccione un producto"
-                );
-                return;
-            }
-
-            garantiaService.registrarGarantia(
-                    campoIdVenta.getText(),
-                    seleccionado.getCodigoProducto(),
-                    campoDescripcionProblema.getText()
+        if (seleccionado == null) {
+            mostrarError(
+                    "Busque una venta y seleccione un producto"
             );
-
-            campoDescripcionProblema.clear();
-
-            cargarGarantias();
-
-            mostrarInfo(
-                    "Solicitud de garantía registrada"
-            );
-
-        } catch (Exception e) {
-
-            mostrarError(e.getMessage());
+            return;
         }
+
+        // Los valores de la pantalla se leen aquí, en el hilo de JavaFX.
+        String idVenta = campoIdVenta.getText();
+        String codigoProducto = seleccionado.getCodigoProducto();
+        String descripcion = campoDescripcionProblema.getText();
+
+        ejecutor.ejecutar(
+                () -> garantiaService.registrarGarantia(
+                        idVenta, codigoProducto, descripcion),
+                registrada -> {
+                    campoDescripcionProblema.clear();
+
+                    cargarGarantias();
+
+                    mostrarInfo(
+                            "Solicitud de garantía registrada"
+                    );
+                },
+                this::mostrarError
+        );
     }
 
     /**
@@ -255,14 +271,93 @@ public class GarantiaController {
     }
 
     /**
-     * Recarga la tabla de garantías desde el servicio.
+     * Elimina la garantía seleccionada, previa confirmación del usuario.
+     *
+     * El servicio solo permite eliminar garantías PENDIENTES; si no lo es,
+     * se muestra el motivo y no se borra nada.
+     */
+    @FXML
+    public void eliminarGarantia() {
+
+        Garantia seleccionada =
+                tablaGarantias
+                        .getSelectionModel()
+                        .getSelectedItem();
+
+        if (seleccionada == null) {
+            mostrarError(
+                    "Seleccione una garantía de la tabla"
+            );
+            return;
+        }
+
+        Alert confirmacion = new Alert(
+                Alert.AlertType.CONFIRMATION,
+                "¿Eliminar la garantía " + seleccionada.getId()
+                        + "? Esta acción no se puede deshacer.",
+                ButtonType.YES,
+                ButtonType.NO
+        );
+        confirmacion.setHeaderText("Confirmar eliminación");
+
+        if (confirmacion.showAndWait().orElse(ButtonType.NO) != ButtonType.YES) {
+            return;
+        }
+
+        String id = seleccionada.getId();
+
+        ejecutor.ejecutar(
+                () -> {
+                    garantiaService.eliminarGarantia(id);
+                    return null;
+                },
+                resultado -> cargarGarantias(),
+                this::mostrarError
+        );
+    }
+
+    /**
+     * Recarga la tabla de garantías desde MySQL aplicando el filtro por estado
+     * elegido ("Todos" muestra todas).
+     *
+     * La consulta corre en un {@link Task} para no congelar la interfaz; la
+     * tabla se actualiza en {@code setOnSucceeded}, que ya se ejecuta en el
+     * hilo de JavaFX. Si se pide una recarga nueva mientras otra sigue en
+     * curso, la anterior se cancela y su resultado se descarta.
      */
     @FXML
     public void cargarGarantias() {
 
-        garantias.setAll(
-                garantiaService.listarGarantias()
+        EstadoGarantia filtro =
+                FiltroEstado.obtener(comboFiltroEstado, EstadoGarantia.class);
+
+        if (tareaCarga != null) {
+            tareaCarga.cancel();
+        }
+
+        Task<List<Garantia>> tarea = new Task<>() {
+            @Override
+            protected List<Garantia> call() {
+                return garantiaService.listarGarantiasPorEstado(filtro);
+            }
+        };
+
+        tarea.setOnSucceeded(evento ->
+                garantias.setAll(tarea.getValue())
         );
+
+        tarea.setOnFailed(evento -> {
+            Throwable error = tarea.getException();
+            mostrarError(error == null || error.getMessage() == null
+                    ? "No se pudieron cargar las garantías"
+                    : error.getMessage());
+        });
+
+        tareaCarga = tarea;
+
+        Thread hilo = new Thread(tarea, "carga-garantias");
+        hilo.setDaemon(true);
+        hilo.start();
     }
 
     /**
@@ -288,19 +383,16 @@ public class GarantiaController {
             return;
         }
 
-        try {
+        String id = seleccionada.getId();
 
-            garantiaService.avanzarEstado(
-                    seleccionada.getId(),
-                    nuevoEstado
-            );
-
-            cargarGarantias();
-
-        } catch (Exception e) {
-
-            mostrarError(e.getMessage());
-        }
+        ejecutor.ejecutar(
+                () -> {
+                    garantiaService.avanzarEstado(id, nuevoEstado);
+                    return null;
+                },
+                resultado -> cargarGarantias(),
+                this::mostrarError
+        );
     }
 
     /**

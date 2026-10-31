@@ -5,12 +5,16 @@ import com.tiendatecnologica.model.Producto;
 import com.tiendatecnologica.service.InventarioService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Controlador de la pantalla de gestión de inventario.
@@ -29,6 +33,9 @@ public class InventarioController {
     /** Servicio encargado de gestionar los movimientos de inventario. */
     private final InventarioService inventarioService =
             new InventarioService();
+
+    /** Última carga de alertas en curso; solo se usa desde el hilo de JavaFX. */
+    private Task<List<Producto>> tareaAlertas;
 
     /** Campo para ingresar el código del producto. */
     @FXML
@@ -238,20 +245,49 @@ public class InventarioController {
      *
      * Se incluyen tanto los productos con bajo stock como
      * aquellos cuya existencia se encuentra agotada.
+     *
+     * Las consultas se hacen en un {@link Task} (fuera del hilo de JavaFX)
+     * para que la ventana no se congele; la tabla se actualiza en
+     * {@code setOnSucceeded}, que ya corre en el hilo de JavaFX. Si se pide
+     * una recarga nueva mientras otra sigue en curso, la anterior se cancela
+     * y su resultado se descarta.
      */
     @FXML
     public void cargarAlertas() {
 
-        ObservableList<Producto> alertas =
-                FXCollections.observableArrayList(
-                        inventarioService.obtenerProductosBajoStock()
-                );
+        if (tareaAlertas != null) {
+            tareaAlertas.cancel();
+        }
 
-        alertas.addAll(
-                inventarioService.obtenerProductosAgotados()
+        Task<List<Producto>> tarea = new Task<>() {
+            @Override
+            protected List<Producto> call() {
+                // Solo consulta datos; no toca ningún control de JavaFX.
+                List<Producto> alertas =
+                        new ArrayList<>(inventarioService.obtenerProductosBajoStock());
+                alertas.addAll(inventarioService.obtenerProductosAgotados());
+                return alertas;
+            }
+        };
+
+        tarea.setOnSucceeded(evento ->
+                tablaAlertas.setItems(
+                        FXCollections.observableArrayList(tarea.getValue())
+                )
         );
 
-        tablaAlertas.setItems(alertas);
+        tarea.setOnFailed(evento -> {
+            Throwable error = tarea.getException();
+            mostrarError(error == null || error.getMessage() == null
+                    ? "No se pudieron cargar las alertas de stock"
+                    : error.getMessage());
+        });
+
+        tareaAlertas = tarea;
+
+        Thread hilo = new Thread(tarea, "carga-alertas");
+        hilo.setDaemon(true);
+        hilo.start();
     }
 
     /**

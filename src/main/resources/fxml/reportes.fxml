@@ -16,11 +16,25 @@
 
         <HBox spacing="8" alignment="CENTER_LEFT">
             <Label text="Reportes" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
-            <Button text="Actualizar reportes" onAction="#cargarReportes"/>
+            <Button fx:id="botonActualizar" text="Actualizar reportes" onAction="#cargarReportes"/>
+            <Label fx:id="labelEstadoReportes" text=""/>
+        </HBox>
+
+        <HBox spacing="8" alignment="CENTER_LEFT">
+            <Label text="Filtrar por fecha  Desde:"/>
+            <DatePicker fx:id="fechaDesde" editable="false" prefWidth="140"/>
+            <Label text="Hasta:"/>
+            <DatePicker fx:id="fechaHasta" editable="false" prefWidth="140"/>
+            <Button fx:id="botonFiltrar" text="Aplicar filtro" onAction="#cargarReportes"/>
+            <Button fx:id="botonLimpiarFiltro" text="Limpiar filtro" onAction="#limpiarFiltroFechas"/>
+            <Label text="(no aplica a bajo inventario)"/>
         </HBox>
 
         <VBox spacing="6">
-            <Label text="Ventas realizadas" style="-fx-font-weight: bold;"/>
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Ventas realizadas" style="-fx-font-weight: bold;"/>
+                <Button text="Exportar CSV" onAction="#exportarVentas"/>
+            </HBox>
             <TableView fx:id="tablaVentas" prefHeight="160">
                 <columns>
                     <TableColumn fx:id="colVentaId" text="Id" prefWidth="90"/>
@@ -33,7 +47,10 @@
         </VBox>
 
         <VBox spacing="6">
-            <Label text="Productos más vendidos" style="-fx-font-weight: bold;"/>
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Productos más vendidos" style="-fx-font-weight: bold;"/>
+                <Button text="Exportar CSV" onAction="#exportarMasVendidos"/>
+            </HBox>
             <TableView fx:id="tablaMasVendidos" prefHeight="160">
                 <columns>
                     <TableColumn fx:id="colMasVendidoCodigo" text="Código" prefWidth="90"/>
@@ -44,7 +61,10 @@
         </VBox>
 
         <VBox spacing="6">
-            <Label text="Productos con bajo inventario o agotados" style="-fx-font-weight: bold;"/>
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Productos con bajo inventario o agotados" style="-fx-font-weight: bold;"/>
+                <Button text="Exportar CSV" onAction="#exportarBajoInventario"/>
+            </HBox>
             <TableView fx:id="tablaBajoInventario" prefHeight="160">
                 <columns>
                     <TableColumn fx:id="colBajoInvCodigo" text="Código" prefWidth="90"/>
@@ -56,7 +76,10 @@
         </VBox>
 
         <VBox spacing="6">
-            <Label text="Compras realizadas a proveedores" style="-fx-font-weight: bold;"/>
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Compras realizadas a proveedores" style="-fx-font-weight: bold;"/>
+                <Button text="Exportar CSV" onAction="#exportarCompras"/>
+            </HBox>
             <TableView fx:id="tablaCompras" prefHeight="160">
                 <columns>
                     <TableColumn fx:id="colCompraId" text="Orden" prefWidth="90"/>

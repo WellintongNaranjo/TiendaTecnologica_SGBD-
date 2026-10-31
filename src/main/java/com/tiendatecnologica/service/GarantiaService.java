@@ -28,7 +28,7 @@ public class GarantiaService {
 
     /**
      * Registra una nueva solicitud de garantía para un producto de una venta,
-     * validando que la venta y el producto existan, que el producto se haya
+     * validando que la venta exista y no esté anulada, que el producto exista, que el producto se haya
      * comprado efectivamente en esa venta y que la solicitud se haga dentro
      * del período de garantía (fecha de venta + meses de garantía del producto).
      *
@@ -36,8 +36,8 @@ public class GarantiaService {
      * @param codigoProducto código del producto sobre el que se reclama
      * @param descripcionProblema descripción del problema reportado por el cliente
      * @return la solicitud de garantía ya registrada, con estado PENDIENTE
-     * @throws IllegalArgumentException si algún dato es inválido, la venta no existe
-     *         o el producto no fue comprado en esa venta
+     * @throws IllegalArgumentException si algún dato es inválido, la venta no existe o está
+     *         anulada, o el producto no fue comprado en esa venta
      * @throws IllegalStateException si el período de garantía ya venció
      */
     public Garantia registrarGarantia(String idVenta, String codigoProducto, String descripcionProblema) {
@@ -48,6 +48,9 @@ public class GarantiaService {
         Venta venta = ventaService.buscarVenta(idVenta);
         if (venta == null) {
             throw new IllegalArgumentException("No existe la venta " + idVenta);
+        }
+        if (!venta.estaCompletada()) {
+            throw new IllegalArgumentException("La venta " + idVenta + " está anulada");
         }
 
         Producto producto = productoService.buscarProducto(codigoProducto);
@@ -95,6 +98,27 @@ public class GarantiaService {
     }
 
     /**
+     * Elimina una solicitud de garantía. Solo se permite si todavía está en
+     * estado PENDIENTE: una vez que entra al flujo de revisión forma parte del
+     * historial y no debe borrarse.
+     *
+     * @param idGarantia id de la solicitud a eliminar
+     * @throws IllegalArgumentException si la solicitud no existe
+     * @throws IllegalStateException si la solicitud ya no está PENDIENTE
+     */
+    public void eliminarGarantia(String idGarantia) {
+        Garantia garantia = garantiaRepository.buscarPorClave(idGarantia);
+        if (garantia == null) {
+            throw new IllegalArgumentException("No existe la garantía " + idGarantia);
+        }
+        if (garantia.getEstado() != EstadoGarantia.PENDIENTE) {
+            throw new IllegalStateException(
+                    "Solo se puede eliminar una garantía PENDIENTE (esta está " + garantia.getEstado() + ")");
+        }
+        garantiaRepository.eliminar(idGarantia);
+    }
+
+    /**
      * Busca una solicitud de garantía por su id.
      *
      * @param idGarantia id a buscar
@@ -105,10 +129,13 @@ public class GarantiaService {
     }
 
     /**
-     * @return todas las solicitudes de garantía registradas
+     * Lista las solicitudes de garantía en un estado dado. El filtro lo aplica MySQL.
+     *
+     * @param estado estado a filtrar; null equivale a "Todos" (sin filtro)
+     * @return las solicitudes de garantía que están en ese estado
      */
-    public List<Garantia> listarGarantias() {
-        return garantiaRepository.obtenerTodos();
+    public List<Garantia> listarGarantiasPorEstado(EstadoGarantia estado) {
+        return garantiaRepository.obtenerPorEstado(estado);
     }
 
     /**

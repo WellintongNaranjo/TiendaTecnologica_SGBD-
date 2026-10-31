@@ -7,8 +7,10 @@ import com.tiendatecnologica.service.DevolucionService;
 import com.tiendatecnologica.service.VentaService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.TableColumn;
@@ -16,6 +18,8 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+
+import java.util.List;
 
 /**
  * Controlador de la pantalla de gestión de devoluciones.
@@ -60,6 +64,16 @@ public class DevolucionController {
     /** Campo para ingresar el motivo de la devolución. */
     @FXML
     private TextArea campoMotivo;
+
+    /** Filtro por estado: "Todos" o uno de los valores de {@link EstadoDevolucion}. */
+    @FXML
+    private ComboBox<String> comboFiltroEstado;
+
+    /** Última carga de la tabla en curso; solo se usa desde el hilo de JavaFX. */
+    private Task<List<Devolucion>> tareaCarga;
+
+    /** Ejecuta en segundo plano las operaciones que escriben (o consultan una venta) en MySQL. */
+    private final EjecutorEnSegundoPlano ejecutor = new EjecutorEnSegundoPlano();
 
     /** Tabla que muestra el historial de devoluciones. */
     @FXML
@@ -125,6 +139,8 @@ public class DevolucionController {
 
         tablaDevoluciones.setItems(devoluciones);
 
+        FiltroEstado.configurar(comboFiltroEstado, EstadoDevolucion.class, this::cargarDevoluciones);
+
         /*
          * Personaliza la forma en que los productos aparecen
          * dentro del ComboBox para facilitar su identificación.
@@ -174,20 +190,24 @@ public class DevolucionController {
             return;
         }
 
-        if (ventaService.buscarVenta(idVenta) == null) {
-            mostrarError("No existe la venta " + idVenta);
-
-            comboProductosVenta.setItems(
-                    FXCollections.observableArrayList()
-            );
-
-            return;
-        }
-
-        comboProductosVenta.setItems(
-                FXCollections.observableArrayList(
-                        ventaService.obtenerDetalle(idVenta)
-                )
+        // La consulta corre en segundo plano; devuelve null si la venta no existe.
+        ejecutor.ejecutar(
+                () -> ventaService.buscarVenta(idVenta) == null
+                        ? null
+                        : ventaService.obtenerDetalle(idVenta),
+                detalles -> {
+                    if (detalles == null) {
+                        mostrarError("No existe la venta " + idVenta);
+                        comboProductosVenta.setItems(
+                                FXCollections.observableArrayList()
+                        );
+                    } else {
+                        comboProductosVenta.setItems(
+                                FXCollections.observableArrayList(detalles)
+                        );
+                    }
+                },
+                this::mostrarError
         );
     }
 
@@ -200,47 +220,47 @@ public class DevolucionController {
     @FXML
     public void solicitarDevolucion() {
 
+        DetalleVenta seleccionado =
+                comboProductosVenta.getValue();
+
+        if (seleccionado == null) {
+            mostrarError(
+                    "Busque una venta y seleccione un producto"
+            );
+            return;
+        }
+
+        int cantidad;
+
         try {
-
-            DetalleVenta seleccionado =
-                    comboProductosVenta.getValue();
-
-            if (seleccionado == null) {
-                mostrarError(
-                        "Busque una venta y seleccione un producto"
-                );
-                return;
-            }
-
-            int cantidad =
-                    Integer.parseInt(campoCantidad.getText());
-
-            devolucionService.registrarDevolucion(
-                    campoIdVenta.getText(),
-                    seleccionado.getCodigoProducto(),
-                    cantidad,
-                    campoMotivo.getText()
-            );
-
-            campoCantidad.clear();
-            campoMotivo.clear();
-
-            cargarDevoluciones();
-
-            mostrarInfo(
-                    "Solicitud de devolución registrada"
-            );
-
+            cantidad = Integer.parseInt(campoCantidad.getText());
         } catch (NumberFormatException e) {
-
             mostrarError(
                     "Indique una cantidad entera válida"
             );
-
-        } catch (Exception e) {
-
-            mostrarError(e.getMessage());
+            return;
         }
+
+        // Los valores de la pantalla se leen aquí, en el hilo de JavaFX.
+        String idVenta = campoIdVenta.getText();
+        String codigoProducto = seleccionado.getCodigoProducto();
+        String motivo = campoMotivo.getText();
+
+        ejecutor.ejecutar(
+                () -> devolucionService.registrarDevolucion(
+                        idVenta, codigoProducto, cantidad, motivo),
+                registrada -> {
+                    campoCantidad.clear();
+                    campoMotivo.clear();
+
+                    cargarDevoluciones();
+
+                    mostrarInfo(
+                            "Solicitud de devolución registrada"
+                    );
+                },
+                this::mostrarError
+        );
     }
 
     /**
@@ -279,14 +299,93 @@ public class DevolucionController {
     }
 
     /**
-     * Recarga la tabla de devoluciones desde el servicio.
+     * Elimina la devolución seleccionada, previa confirmación del usuario.
+     *
+     * El servicio solo permite eliminar devoluciones PENDIENTES; si no lo es,
+     * se muestra el motivo y no se borra nada.
+     */
+    @FXML
+    public void eliminarDevolucion() {
+
+        Devolucion seleccionada =
+                tablaDevoluciones
+                        .getSelectionModel()
+                        .getSelectedItem();
+
+        if (seleccionada == null) {
+            mostrarError(
+                    "Seleccione una devolución de la tabla"
+            );
+            return;
+        }
+
+        Alert confirmacion = new Alert(
+                Alert.AlertType.CONFIRMATION,
+                "¿Eliminar la devolución " + seleccionada.getId()
+                        + "? Esta acción no se puede deshacer.",
+                ButtonType.YES,
+                ButtonType.NO
+        );
+        confirmacion.setHeaderText("Confirmar eliminación");
+
+        if (confirmacion.showAndWait().orElse(ButtonType.NO) != ButtonType.YES) {
+            return;
+        }
+
+        String id = seleccionada.getId();
+
+        ejecutor.ejecutar(
+                () -> {
+                    devolucionService.eliminarDevolucion(id);
+                    return null;
+                },
+                resultado -> cargarDevoluciones(),
+                this::mostrarError
+        );
+    }
+
+    /**
+     * Recarga la tabla de devoluciones desde MySQL aplicando el filtro por
+     * estado elegido ("Todos" muestra todas).
+     *
+     * La consulta corre en un {@link Task} para no congelar la interfaz; la
+     * tabla se actualiza en {@code setOnSucceeded}, que ya se ejecuta en el
+     * hilo de JavaFX. Si se pide una recarga nueva mientras otra sigue en
+     * curso, la anterior se cancela y su resultado se descarta.
      */
     @FXML
     public void cargarDevoluciones() {
 
-        devoluciones.setAll(
-                devolucionService.listarDevoluciones()
+        EstadoDevolucion filtro =
+                FiltroEstado.obtener(comboFiltroEstado, EstadoDevolucion.class);
+
+        if (tareaCarga != null) {
+            tareaCarga.cancel();
+        }
+
+        Task<List<Devolucion>> tarea = new Task<>() {
+            @Override
+            protected List<Devolucion> call() {
+                return devolucionService.listarDevolucionesPorEstado(filtro);
+            }
+        };
+
+        tarea.setOnSucceeded(evento ->
+                devoluciones.setAll(tarea.getValue())
         );
+
+        tarea.setOnFailed(evento -> {
+            Throwable error = tarea.getException();
+            mostrarError(error == null || error.getMessage() == null
+                    ? "No se pudieron cargar las devoluciones"
+                    : error.getMessage());
+        });
+
+        tareaCarga = tarea;
+
+        Thread hilo = new Thread(tarea, "carga-devoluciones");
+        hilo.setDaemon(true);
+        hilo.start();
     }
 
     /**
@@ -312,19 +411,16 @@ public class DevolucionController {
             return;
         }
 
-        try {
+        String id = seleccionada.getId();
 
-            devolucionService.avanzarEstado(
-                    seleccionada.getId(),
-                    nuevoEstado
-            );
-
-            cargarDevoluciones();
-
-        } catch (Exception e) {
-
-            mostrarError(e.getMessage());
-        }
+        ejecutor.ejecutar(
+                () -> {
+                    devolucionService.avanzarEstado(id, nuevoEstado);
+                    return null;
+                },
+                resultado -> cargarDevoluciones(),
+                this::mostrarError
+        );
     }
 
     /**

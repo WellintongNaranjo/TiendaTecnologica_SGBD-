@@ -47,12 +47,15 @@
                     <TableColumn fx:id="colDevolucionEstado" text="Estado" prefWidth="110"/>
                 </columns>
             </TableView>
-            <HBox spacing="8">
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Filtrar por estado:"/>
+                <ComboBox fx:id="comboFiltroEstado" prefWidth="150"/>
                 <Button text="Actualizar lista" onAction="#cargarDevoluciones"/>
                 <Button text="Enviar a revisión" onAction="#enviarARevision"/>
                 <Button text="Aprobar" onAction="#aprobarDevolucion"/>
                 <Button text="Rechazar" onAction="#rechazarDevolucion"/>
                 <Button text="Finalizar" onAction="#finalizarDevolucion"/>
+                <Button text="Eliminar" onAction="#eliminarDevolucion"/>
             </HBox>
         </VBox>
     </center>

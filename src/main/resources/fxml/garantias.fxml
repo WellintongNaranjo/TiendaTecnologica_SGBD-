@@ -44,12 +44,15 @@
                     <TableColumn fx:id="colGarantiaEstado" text="Estado" prefWidth="120"/>
                 </columns>
             </TableView>
-            <HBox spacing="8">
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="Filtrar por estado:"/>
+                <ComboBox fx:id="comboFiltroEstado" prefWidth="150"/>
                 <Button text="Actualizar lista" onAction="#cargarGarantias"/>
                 <Button text="Enviar a revisión" onAction="#enviarARevision"/>
                 <Button text="Aprobar" onAction="#aprobarGarantia"/>
                 <Button text="Rechazar" onAction="#rechazarGarantia"/>
                 <Button text="Finalizar" onAction="#finalizarGarantia"/>
+                <Button text="Eliminar" onAction="#eliminarGarantia"/>
             </HBox>
         </VBox>
     </center>
